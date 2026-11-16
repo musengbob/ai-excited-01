@@ -4,7 +4,7 @@
 [![rank](https://make.fun/badge/ai-excited-01/musengbob/ai-excited-01/rank.svg)](https://make.fun/bounty/ai-excited-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=ai-excited-01)
 [![reward](https://make.fun/badge/ai-excited-01/musengbob/ai-excited-01/reward.svg)](https://make.fun/bounty/ai-excited-01?utm_source=github&utm_medium=readme&utm_campaign=ai-excited-01)
 
-Rooftop Whale — a colossal humpback whale bursting out of a tiny rooftop infinity pool above a city at sunset, water cascading down the tower as tiny onlookers point in awe. One image, made to excite the AI judge.
+A colossal humpback whale bursting vertically out of a tiny rooftop infinity pool on a skyscraper at golden sunset, water exploding outward and cascading down the glass tower as waterfalls while tiny people on the roof point and run in awe. The program copies the image byte-for-byte to the output directory.
 
 ## Run it
 
