@@ -1,9 +1,14 @@
-// ai-excited-01 entry: validates and copies the bundled image byte-for-byte
-// to the output directory. Node 22, standard library only, no network.
+// Rooftop Whale — ai-excited-01 entry program (Node 22, stdlib only).
 //
-// Usage:  MAKEFUN_OUTPUT_DIR=<dir> node main.ts [--help]
-// Output: a single entry.png in the output directory, identical to the
-// bundled entry.png. Exits non-zero with a clear message on any failure.
+// Reads the entry image (entry.png, next to this file), validates it
+// against the competition gate (JPEG or PNG magic, 1..1048576 bytes,
+// at most 1024x1024 pixels), then copies it byte-for-byte to
+// $MAKEFUN_OUTPUT_DIR/entry.png and prints one summary line.
+//
+// Usage:
+//   MAKEFUN_OUTPUT_DIR=out node main.ts
+//   node main.ts --help
+
 import { copyFileSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,100 +16,84 @@ import { fileURLToPath } from "node:url";
 const MAX_BYTES = 1048576;
 const MAX_DIM = 1024;
 
-const here = dirname(fileURLToPath(import.meta.url));
-const source = join(here, "entry.png");
-const outDir = process.env.MAKEFUN_OUTPUT_DIR || "/output";
-const target = join(outDir, "entry.png");
-
-if (process.argv.slice(2).includes("--help")) {
-  console.log(
-    "Usage: MAKEFUN_OUTPUT_DIR=<dir> node main.ts [--help]\n" +
-      "Validates the bundled entry.png (JPEG/PNG, 1..1048576 bytes, at most " +
-      "1024x1024) and copies it byte-for-byte to <dir>/entry.png.",
-  );
-  process.exit(0);
-}
-
-function fail(message: string): never {
+function fail(message) {
   console.error(`error: ${message}`);
   process.exit(1);
 }
 
-function isPng(bytes: Buffer): boolean {
-  return (
-    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e &&
-    bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a &&
-    bytes[6] === 0x1a && bytes[7] === 0x0a
-  );
+// Minimal PNG header parse: width/height are big-endian u32 at bytes 16..24.
+function pngDimensions(buf) {
+  if (buf.length < 24) fail("PNG file is too short to hold an IHDR chunk");
+  if (buf.readUInt32BE(12) !== 0x49484452) fail("PNG is missing its IHDR chunk");
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20), kind: "PNG" };
 }
 
-function isJpeg(bytes: Buffer): boolean {
-  return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-}
-
-// Minimal dimension parse: PNG IHDR (width/height at bytes 16..24) or JPEG
-// SOF0/SOF2 marker scan (height/width in the frame header).
-function parseDimensions(bytes: Buffer): { kind: string; width: number; height: number } {
-  if (isPng(bytes)) {
-    if (bytes.length < 24 || bytes.readUInt32BE(12) !== 0x49484452) {
-      fail("entry.png has a truncated or corrupt PNG header (no IHDR)");
+// Minimal JPEG header parse: walk the segments until a SOF0-SOF2 marker
+// (0xC0-0xCF except 0xC4, 0xC8, 0xCC) gives height/width.
+function jpegDimensions(buf) {
+  let offset = 2; // skip SOI (FF D8)
+  while (offset + 9 <= buf.length) {
+    if (buf[offset] !== 0xff) fail("JPEG stream is malformed (expected a marker)");
+    const marker = buf[offset + 1];
+    if (marker === 0xd8 || marker === 0x01) { offset += 2; continue; }
+    if (marker === 0xd9) fail("JPEG has no SOF frame before its end marker");
+    if (marker >= 0xd0 && marker <= 0xd7) { offset += 2; continue; }
+    const length = buf.readUInt16BE(offset + 2);
+    if (length < 2 || offset + 2 + length > buf.length) fail("JPEG segment overruns the file");
+    const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isSof) {
+      return { height: buf.readUInt16BE(offset + 5), width: buf.readUInt16BE(offset + 7), kind: "JPEG" };
     }
-    return {
-      kind: "PNG",
-      width: bytes.readUInt32BE(16),
-      height: bytes.readUInt32BE(20),
-    };
+    offset += 2 + length;
   }
-  if (isJpeg(bytes)) {
-    let i = 2;
-    while (i + 9 < bytes.length) {
-      if (bytes[i] !== 0xff) {
-        fail("entry.png has a corrupt JPEG marker stream");
-      }
-      const marker = bytes[i + 1];
-      if (marker === 0xd9 || marker === 0xda) break; // EOI / SOS: no SOF found
-      const len = bytes.readUInt16BE(i + 2);
-      if (len < 2 || i + 2 + len > bytes.length) {
-        fail("entry.png has a corrupt JPEG segment length");
-      }
-      if (marker === 0xc0 || marker === 0xc2) {
-        // SOF0/SOF2: [precision:1][height:2][width:2]
-        return {
-          kind: "JPEG",
-          height: bytes.readUInt16BE(i + 5),
-          width: bytes.readUInt16BE(i + 7),
-        };
-      }
-      i += 2 + len;
-    }
-    fail("entry.png is a JPEG but has no SOF0/SOF2 frame header");
-  }
-  fail("entry.png is neither PNG nor JPEG (bad magic bytes)");
+  fail("JPEG has no SOF frame");
 }
 
-const bytes = readFileSync(source);
-if (bytes.length < 1 || bytes.length > MAX_BYTES) {
-  fail(`entry.png is ${bytes.length} bytes, must be 1..${MAX_BYTES}`);
-}
-const info = parseDimensions(bytes);
-if (info.width < 1 || info.height < 1) {
-  fail(`entry.png has invalid dimensions ${info.width}x${info.height}`);
-}
-if (info.width > MAX_DIM || info.height > MAX_DIM) {
-  fail(
-    `entry.png is ${info.width}x${info.height}, larger than the ${MAX_DIM}x${MAX_DIM} limit`,
-  );
+function main() {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log("Usage: MAKEFUN_OUTPUT_DIR=<dir> node main.ts [--help]");
+    console.log("");
+    console.log("Validates entry.png (JPEG or PNG, 1..1048576 bytes, at most 1024x1024)");
+    console.log("and copies it byte-for-byte to <dir>/entry.png.");
+    console.log("");
+    console.log("Options:");
+    console.log("  --help, -h   print this usage and exit");
+    process.exit(0);
+  }
+  const here = dirname(fileURLToPath(import.meta.url));
+  const source = join(here, "entry.png");
+
+  let stat;
+  try {
+    stat = statSync(source);
+  } catch {
+    fail(`cannot read ${source} (missing entry image)`);
+  }
+  if (!stat.isFile()) fail(`${source} is not a regular file`);
+  if (stat.size < 1 || stat.size > MAX_BYTES) {
+    fail(`entry.png is ${stat.size} bytes, outside the allowed 1..${MAX_BYTES} range`);
+  }
+
+  const bytes = readFileSync(source);
+  let dims;
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    dims = pngDimensions(bytes);
+  } else if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    dims = jpegDimensions(bytes);
+  } else {
+    fail("entry.png is neither a PNG nor a JPEG — its first bytes match neither format's magic (expected 89 50 4E 47 or FF D8 FF)");
+  }
+  if (dims.width < 1 || dims.height < 1 || dims.width > MAX_DIM || dims.height > MAX_DIM) {
+    fail(`entry.png is ${dims.width}x${dims.height}, larger than the ${MAX_DIM}x${MAX_DIM} limit`);
+  }
+
+  const outDir = process.env.MAKEFUN_OUTPUT_DIR;
+  if (!outDir) fail("MAKEFUN_OUTPUT_DIR is not set (set it to the output directory)");
+  const outPath = resolve(outDir, "entry.png");
+  mkdirSync(outDir, { recursive: true });
+  copyFileSync(source, outPath);
+
+  console.log(`wrote ${bytes.length} bytes (${dims.width}x${dims.height} ${dims.kind}) to ${outPath}`);
 }
 
-mkdirSync(outDir, { recursive: true });
-copyFileSync(source, target);
-const written = statSync(target).size;
-if (written !== bytes.length) {
-  fail(
-    `copy incomplete: wrote ${written} of ${bytes.length} bytes to ${resolve(target)} — ` +
-      "delete the partial file and re-run",
-  );
-}
-console.log(
-  `wrote ${written} bytes (${info.width}x${info.height} ${info.kind}) to ${resolve(target)}`,
-);
+main();
