@@ -1,43 +1,31 @@
-// main.ts — ai-excited-01 entry "The Mountain Wakes".
-//
-// The entry image lives in this repository as entry.png. This program
-// copies it byte for byte into the grader's output directory so the
-// judge sees exactly the image we built. Node 22, standard library
-// only, no network, fully deterministic: the same input bytes always
-// produce the same output bytes.
-
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+// ai-excited-01: copy the entry image byte-for-byte to the output directory.
+// The image is a JPEG (first bytes FF D8 FF) stored under the name entry.png,
+// which the competition allows: the file is told apart by its first bytes.
+import { copyFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// The repository root is the directory holding this file.
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)));
-const sourceImage = join(repoRoot, "entry.png");
+const here = dirname(fileURLToPath(import.meta.url));
+const source = join(here, "entry.png");
+const outDir = process.env.MAKEFUN_OUTPUT_DIR || "/output";
+const target = join(outDir, "entry.png");
 
-// The grader sets MAKEFUN_OUTPUT_DIR; otherwise we write to /output.
-const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
-const destination = join(outputDir, "entry.png");
-
-if (!existsSync(sourceImage)) {
-  throw new Error(`entry image not found: ${sourceImage}`);
+const bytes = readFileSync(source);
+const isPng = bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50
+  && bytes[2] === 0x4e && bytes[3] === 0x47;
+const isJpeg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8
+  && bytes[2] === 0xff;
+if (!isPng && !isJpeg) {
+  throw new Error("entry.png is neither PNG nor JPEG (bad magic bytes)");
 }
-
-mkdirSync(outputDir, { recursive: true });
-copyFileSync(sourceImage, destination);
-
-// Confirm the copy landed intact by comparing byte lengths and by
-// checking the PNG signature of what we wrote, so a truncated or
-// corrupted copy can never pass silently.
-const sourceBytes = readFileSync(sourceImage);
-const writtenBytes = readFileSync(destination);
-const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-if (!writtenBytes.subarray(0, 8).equals(pngSignature)) {
-  throw new Error(`output is not a PNG: ${destination}`);
+if (bytes.length > 1048576) {
+  throw new Error(`entry.png is ${bytes.length} bytes, over the 1 MiB limit`);
 }
-if (sourceBytes.length !== writtenBytes.length) {
-  throw new Error(
-    `copy mismatch: wrote ${writtenBytes.length} bytes, expected ${sourceBytes.length}`,
-  );
+mkdirSync(outDir, { recursive: true });
+writeFileSync(target, bytes);
+const written = statSync(target).size;
+if (written !== bytes.length) {
+  throw new Error(`wrote ${written} bytes, expected ${bytes.length}`);
 }
-
-console.log(`wrote ${destination} (${writtenBytes.length} bytes)`);
+console.log(`wrote ${target} (${written} bytes, ${isPng ? "PNG" : "JPEG"})`);
