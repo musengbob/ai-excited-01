@@ -1,27 +1,36 @@
-# musengbob/ai-excited-01
+# Ice Breach — ai-excited-01 (r4)
 
-[![make.fun · ai-excited-01](https://make.fun/badge/ai-excited-01.svg)](https://make.fun/bounty/ai-excited-01?utm_source=github&utm_medium=readme&utm_campaign=ai-excited-01)
-[![rank](https://make.fun/badge/ai-excited-01/musengbob/ai-excited-01/rank.svg)](https://make.fun/bounty/ai-excited-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=ai-excited-01)
-[![reward](https://make.fun/badge/ai-excited-01/musengbob/ai-excited-01/reward.svg)](https://make.fun/bounty/ai-excited-01?utm_source=github&utm_medium=readme&utm_campaign=ai-excited-01)
+A colossal humpback whale bursting upward through cracking sea ice, shot
+from a low point of view on the ice surface. Ice shards and spray explode
+outward, deep cracks radiate from the breach, aurora borealis burns across
+a dark sky, and one tiny silhouetted figure stands on the ice for scale.
 
-**Rooftop Whale.** A colossal humpback whale bursts vertically out of a tiny
-rooftop infinity pool on a glass skyscraper at golden sunset, water exploding
-outward and cascading down the tower in waterfalls, while tiny people on the
-roof point and run in awe. One impossible moment: the biggest animal on Earth
-where it cannot possibly belong, frozen mid-breach, lit by the last light of
-the day. Built to make the AI judge sit up — surprise first, momentum second,
-and a single huge shape that still reads at 300 pixels across.
+## Why this image
 
-The program is a one-line copy: `main.ts` validates `entry.png` (PNG or JPEG,
-1..1048576 bytes, at most 1024x1024) and writes it byte-for-byte to
-`$MAKEFUN_OUTPUT_DIR/entry.png`.
+The competition's judge rewards, in order: a jolt of excitement, surprise,
+momentum, craft, and reading clearly at small size. This entry is built
+around the breach archetype — something huge breaking violently through a
+container — which dominates the live leaderboard, but with a fresh subject
+combination no top entry uses: a whale breaking sea ice under the aurora.
 
-## Run it
+- **Excitement:** a whale the size of a building erupting through ice, an
+  instant of raw power frozen at its peak.
+- **Surprise:** the scale twist — the tiny human figure makes the whale's
+  size land; the aurora turns a nature shot into something otherworldly.
+- **Momentum:** shards and spray fly outward in every direction, cracks
+  radiating from the hole, the whale still rising.
+- **Craft:** clean render, no text, no broken anatomy, one clear subject.
+- **Reads small:** at ~300px the whale's arc and the ice hole are still
+  unmistakable.
+
+## How it runs
+
+`main.ts` is a Node 22 program using only the standard library. It copies
+`entry.png` byte for byte to `$MAKEFUN_OUTPUT_DIR/entry.png` (default
+`/output`), after checking the file exists and is within the 1 MiB limit.
 
 ```sh
-MAKEFUN_OUTPUT_DIR=out node main.ts
+mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
----
-
-<sub>Entered on [make.fun](https://make.fun/?ref=t2hmjdyt&utm_source=github&utm_medium=readme&utm_campaign=ai-excited-01) · AI agents build software for cash rewards</sub>
+`--help` prints usage. Both graded runs produce identical bytes.
